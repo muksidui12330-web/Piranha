@@ -1,0 +1,182 @@
+{
+  "entities": {
+    "ShopConfig": {
+      "title": "ShopConfig",
+      "description": "Public shop settings, hours, delivery charge, minimum order, and UPI details.",
+      "type": "object",
+      "properties": {
+        "shopName": { "type": "string" },
+        "bannerText": { "type": "string" },
+        "bannerTextBn": { "type": "string" },
+        "locationText": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "openingHours": { "type": "string" },
+        "deliveryCharge": { "type": "integer" },
+        "minimumOrderAmount": { "type": "integer" },
+        "deliveryMinutes": { "type": "integer" },
+        "deliveryTimeText": { "type": "string" },
+        "deliveryTimeTextBn": { "type": "string" },
+        "upiId": { "type": "string" },
+        "upiQrBase64": { "type": "string" },
+        "shopPhotoBase64": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "shopName",
+        "bannerText",
+        "locationText",
+        "openingHours",
+        "deliveryCharge",
+        "minimumOrderAmount",
+        "deliveryMinutes",
+        "deliveryTimeText",
+        "upiId",
+        "updatedAt"
+      ]
+    },
+    "StaffMember": {
+      "title": "StaffMember",
+      "description": "Role assignment document keyed by lowercase verified Gmail address for Admin or Packer access.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["ADMIN", "PACKER"] },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "createdAt", "updatedAt"]
+    },
+    "CatalogItem": {
+      "title": "CatalogItem",
+      "description": "Bilingual grocery catalog product with availability and alternative item links.",
+      "type": "object",
+      "properties": {
+        "nameEn": { "type": "string" },
+        "nameBn": { "type": "string" },
+        "category": { "type": "string", "enum": ["GRAINS", "OILS_SPICES", "DAIRY_TEA", "SNACKS_ESSENTIALS"] },
+        "price": { "type": "integer" },
+        "unit": { "type": "string" },
+        "available": { "type": "boolean" },
+        "imageKey": { "type": "string" },
+        "imageBase64": { "type": "string" },
+        "similarItemIds": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["nameEn", "nameBn", "category", "price", "unit", "available", "similarItemIds", "createdAt", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Customer profile, saved delivery address, GPS coordinates, and trust rating.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "mobile": { "type": "string" },
+        "address": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "rating": { "type": "integer" },
+        "successfulDeliveredCount": { "type": "integer" },
+        "cashEnabled": { "type": "boolean" },
+        "cashAdminOverride": { "type": "boolean" },
+        "profileCompleted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "email",
+        "name",
+        "mobile",
+        "address",
+        "rating",
+        "successfulDeliveredCount",
+        "cashEnabled",
+        "cashAdminOverride",
+        "profileCompleted",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer grocery order with items, billing breakdown, UPI/Cash payment details, and status tracking.",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerMobile": { "type": "string" },
+        "customerAddress": { "type": "string" },
+        "customerLat": { "type": "number" },
+        "customerLng": { "type": "number" },
+        "items": { "type": "array" },
+        "itemsTotal": { "type": "integer" },
+        "deliveryCharge": { "type": "integer" },
+        "grandTotal": { "type": "integer" },
+        "paymentMethod": { "type": "string", "enum": ["CASH", "UPI"] },
+        "upiTransactionId": { "type": "string" },
+        "paymentScreenshotBase64": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": [
+            "WAITING_PAYMENT_CONFIRMATION",
+            "PLACED",
+            "PAYMENT_CONFIRMED",
+            "PACKING",
+            "READY",
+            "OUT_FOR_DELIVERY",
+            "DELIVERED",
+            "CANCELLED"
+          ]
+        },
+        "cashReceived": { "type": "boolean" },
+        "adminAcknowledged": { "type": "boolean" },
+        "confirmedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "customerId",
+        "customerName",
+        "customerMobile",
+        "customerAddress",
+        "items",
+        "itemsTotal",
+        "deliveryCharge",
+        "grandTotal",
+        "paymentMethod",
+        "status",
+        "cashReceived",
+        "adminAcknowledged",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/config/{configId}": {
+      "schema": { "$ref": "#/entities/ShopConfig" },
+      "description": "Shop configuration singleton at /config/shop"
+    },
+    "/staff/{staffEmail}": {
+      "schema": { "$ref": "#/entities/StaffMember" },
+      "description": "Verified Gmail role assignments for Admin and Packer accounts"
+    },
+    "/items/{itemId}": {
+      "schema": { "$ref": "#/entities/CatalogItem" },
+      "description": "Bilingual kirana catalog items"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Customer profiles, delivery addresses, GPS, and trust ratings"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer orders across Customer, Packer, and Admin workflows"
+    }
+  }
+}

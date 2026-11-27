@@ -1,0 +1,337 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidEmailId(email) {
+      return email is string && email.size() >= 5 && email.size() <= 120 &&
+             email.matches('^[a-z0-9_.+-]+@[a-z0-9-]+\\.[a-z0-9-.]+$');
+    }
+
+    function isVerifiedEmail() {
+      return isSignedIn() &&
+             request.auth.token.email_verified == true &&
+             request.auth.token.email is string;
+    }
+
+    function userEmailLower() {
+      return request.auth.token.email.lower();
+    }
+
+    function isBootstrapAdmin() {
+      return isVerifiedEmail() && userEmailLower() == 'muksidui12330@gmail.com';
+    }
+
+    function staffPath(email) {
+      return /databases/$(database)/documents/staff/$(email);
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || (
+        isVerifiedEmail() &&
+        exists(staffPath(userEmailLower())) &&
+        get(staffPath(userEmailLower())).data.role == 'ADMIN'
+      );
+    }
+
+    function isPacker() {
+      return isVerifiedEmail() &&
+             exists(staffPath(userEmailLower())) &&
+             get(staffPath(userEmailLower())).data.role == 'PACKER';
+    }
+
+    // --- VALIDATION HELPERS ---
+    function isValidShopConfig(data) {
+      return data.shopName is string && data.shopName.size() >= 1 && data.shopName.size() <= 80 &&
+             data.bannerText is string && data.bannerText.size() <= 160 &&
+             (!('bannerTextBn' in data) || (data.bannerTextBn is string && data.bannerTextBn.size() <= 160)) &&
+             data.locationText is string && data.locationText.size() >= 1 && data.locationText.size() <= 200 &&
+             (!('latitude' in data) || data.latitude is number) &&
+             (!('longitude' in data) || data.longitude is number) &&
+             data.openingHours is string && data.openingHours.size() >= 1 && data.openingHours.size() <= 80 &&
+             data.deliveryCharge is int && data.deliveryCharge >= 0 && data.deliveryCharge <= 500 &&
+             data.minimumOrderAmount is int && data.minimumOrderAmount >= 0 && data.minimumOrderAmount <= 5000 &&
+             data.deliveryMinutes is int && data.deliveryMinutes >= 5 && data.deliveryMinutes <= 180 &&
+             data.deliveryTimeText is string && data.deliveryTimeText.size() >= 1 && data.deliveryTimeText.size() <= 80 &&
+             (!('deliveryTimeTextBn' in data) || (data.deliveryTimeTextBn is string && data.deliveryTimeTextBn.size() <= 80)) &&
+             data.upiId is string && data.upiId.size() <= 100 &&
+             (!('upiQrBase64' in data) || (data.upiQrBase64 is string && data.upiQrBase64.size() <= 280000)) &&
+             (!('shopPhotoBase64' in data) || (data.shopPhotoBase64 is string && data.shopPhotoBase64.size() <= 280000)) &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidStaffMember(data, staffEmail) {
+      return data.email is string && data.email == staffEmail &&
+             isValidEmailId(data.email) &&
+             data.role in ['ADMIN', 'PACKER'] &&
+             (!('name' in data) || (data.name is string && data.name.size() <= 80)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCatalogItem(data) {
+      return data.nameEn is string && data.nameEn.size() >= 1 && data.nameEn.size() <= 100 &&
+             data.nameBn is string && data.nameBn.size() >= 1 && data.nameBn.size() <= 100 &&
+             data.category in ['GRAINS', 'OILS_SPICES', 'DAIRY_TEA', 'SNACKS_ESSENTIALS'] &&
+             data.price is int && data.price >= 1 && data.price <= 100000 &&
+             data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 40 &&
+             data.available is bool &&
+             (!('imageKey' in data) || (data.imageKey is string && data.imageKey.size() <= 60)) &&
+             (!('imageBase64' in data) || (data.imageBase64 is string && data.imageBase64.size() <= 280000)) &&
+             data.similarItemIds is list && data.similarItemIds.size() <= 5 &&
+             (data.similarItemIds.size() == 0 || data.similarItemIds[0] is string) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.uid is string && data.uid == userId &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 120 &&
+             data.name is string && data.name.size() <= 80 &&
+             data.mobile is string && data.mobile.size() <= 20 &&
+             data.address is string && data.address.size() <= 300 &&
+             (!('latitude' in data) || data.latitude is number) &&
+             (!('longitude' in data) || data.longitude is number) &&
+             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+             data.successfulDeliveredCount is int && data.successfulDeliveredCount >= 0 && data.successfulDeliveredCount <= 1000000 &&
+             data.cashEnabled is bool &&
+             data.cashAdminOverride is bool &&
+             data.profileCompleted is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidOrder(data) {
+      return data.customerId is string && isValidId(data.customerId) &&
+             data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 80 &&
+             data.customerMobile is string && data.customerMobile.size() >= 6 && data.customerMobile.size() <= 20 &&
+             data.customerAddress is string && data.customerAddress.size() >= 3 && data.customerAddress.size() <= 300 &&
+             (!('customerLat' in data) || data.customerLat is number) &&
+             (!('customerLng' in data) || data.customerLng is number) &&
+             data.items is list && data.items.size() >= 1 && data.items.size() <= 50 &&
+             data.items[0] is map &&
+             data.itemsTotal is int && data.itemsTotal >= 1 && data.itemsTotal <= 1000000 &&
+             data.deliveryCharge is int && data.deliveryCharge >= 0 && data.deliveryCharge <= 1000 &&
+             data.grandTotal is int && data.grandTotal == data.itemsTotal + data.deliveryCharge &&
+             data.paymentMethod in ['CASH', 'UPI'] &&
+             (!('upiTransactionId' in data) || (data.upiTransactionId is string && data.upiTransactionId.size() <= 80)) &&
+             (!('paymentScreenshotBase64' in data) || (data.paymentScreenshotBase64 is string && data.paymentScreenshotBase64.size() <= 350000)) &&
+             data.status in [
+               'WAITING_PAYMENT_CONFIRMATION',
+               'PLACED',
+               'PAYMENT_CONFIRMED',
+               'PACKING',
+               'READY',
+               'OUT_FOR_DELIVERY',
+               'DELIVERED',
+               'CANCELLED'
+             ] &&
+             data.cashReceived is bool &&
+             data.adminAcknowledged is bool &&
+             (!('confirmedAt' in data) || (data.confirmedAt is timestamp && data.confirmedAt <= request.time)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // --- COLLECTIONS ---
+
+    // 1. Shop Config (/config/shop)
+    match /config/{configId} {
+      allow get: if isSignedIn() && configId == 'shop';
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() && configId == 'shop' &&
+                               incoming().keys().hasAll([
+                                 'shopName', 'bannerText', 'locationText', 'openingHours',
+                                 'deliveryCharge', 'minimumOrderAmount', 'deliveryMinutes',
+                                 'deliveryTimeText', 'upiId', 'updatedAt'
+                               ]) &&
+                               incoming().keys().hasOnly([
+                                 'shopName', 'bannerText', 'bannerTextBn', 'locationText',
+                                 'latitude', 'longitude', 'openingHours', 'deliveryCharge',
+                                 'minimumOrderAmount', 'deliveryMinutes', 'deliveryTimeText',
+                                 'deliveryTimeTextBn', 'upiId', 'upiQrBase64', 'shopPhotoBase64',
+                                 'updatedAt'
+                               ]) &&
+                               isValidShopConfig(incoming());
+      allow delete: if false;
+    }
+
+    // 2. Staff Role Registry (/staff/{staffEmail})
+    match /staff/{staffEmail} {
+      allow get: if isSignedIn() && isValidEmailId(staffEmail) &&
+                    ((isVerifiedEmail() && userEmailLower() == staffEmail) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidEmailId(staffEmail) &&
+                       incoming().keys().hasAll(['email', 'role', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['email', 'role', 'name', 'createdAt', 'updatedAt']) &&
+                       isValidStaffMember(incoming(), staffEmail);
+      allow update: if isAdmin() && isValidEmailId(staffEmail) &&
+                       incoming().email == existing().email &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().keys().hasOnly(['email', 'role', 'name', 'createdAt', 'updatedAt']) &&
+                       isValidStaffMember(incoming(), staffEmail);
+      allow delete: if isAdmin() && isValidEmailId(staffEmail) && staffEmail != 'muksidui12330@gmail.com';
+    }
+
+    // 3. Catalog Items (/items/{itemId})
+    match /items/{itemId} {
+      allow get: if isSignedIn() && isValidId(itemId);
+      allow list: if isSignedIn();
+      allow create: if isAdmin() && isValidId(itemId) &&
+                       incoming().keys().hasAll([
+                         'nameEn', 'nameBn', 'category', 'price', 'unit',
+                         'available', 'similarItemIds', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'nameEn', 'nameBn', 'category', 'price', 'unit',
+                         'available', 'imageKey', 'imageBase64', 'similarItemIds',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidCatalogItem(incoming());
+      allow update: if isAdmin() && isValidId(itemId) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().keys().hasOnly([
+                         'nameEn', 'nameBn', 'category', 'price', 'unit',
+                         'available', 'imageKey', 'imageBase64', 'similarItemIds',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidCatalogItem(incoming());
+      allow delete: if isAdmin() && isValidId(itemId);
+    }
+
+    // 4. Customer Profiles (/users/{userId})
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) &&
+                    (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().uid == request.auth.uid &&
+                       incoming().rating == 5 &&
+                       incoming().successfulDeliveredCount == 0 &&
+                       incoming().cashEnabled == true &&
+                       incoming().cashAdminOverride == false &&
+                       incoming().keys().hasAll([
+                         'uid', 'email', 'name', 'mobile', 'address',
+                         'rating', 'successfulDeliveredCount', 'cashEnabled',
+                         'cashAdminOverride', 'profileCompleted', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'uid', 'email', 'name', 'mobile', 'address',
+                         'latitude', 'longitude', 'rating', 'successfulDeliveredCount',
+                         'cashEnabled', 'cashAdminOverride', 'profileCompleted',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidUserProfile(incoming(), userId);
+
+      allow update: if isSignedIn() && isValidId(userId) &&
+                       isValidUserProfile(incoming(), userId) &&
+                       incoming().uid == existing().uid &&
+                       incoming().email == existing().email &&
+                       incoming().createdAt == existing().createdAt && (
+                         (isAdmin() &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'name', 'mobile', 'address', 'latitude', 'longitude',
+                            'rating', 'successfulDeliveredCount', 'cashEnabled',
+                            'cashAdminOverride', 'profileCompleted', 'updatedAt'
+                          ])) ||
+                         // Customer updating own profile details
+                         (request.auth.uid == userId &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'name', 'mobile', 'address', 'latitude', 'longitude',
+                            'profileCompleted', 'updatedAt'
+                          ])) ||
+                         // Customer self-cancellation penalty: rating decreases by 1, cash disables at 1 star
+                         (request.auth.uid == userId &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'rating', 'cashEnabled', 'updatedAt'
+                          ]) &&
+                          incoming().rating == (existing().rating > 1 ? existing().rating - 1 : 1) &&
+                          (incoming().rating > 1 || incoming().cashEnabled == false))
+                       );
+      allow delete: if false;
+    }
+
+    // 5. Orders (/orders/{orderId})
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && isValidId(orderId) &&
+                    (existing().customerId == request.auth.uid || isAdmin() || isPacker());
+      allow list: if isSignedIn() &&
+                     (existing().customerId == request.auth.uid || isAdmin() || isPacker());
+
+      allow create: if isSignedIn() && isValidId(orderId) &&
+                       incoming().customerId == request.auth.uid &&
+                       incoming().cashReceived == false &&
+                       incoming().adminAcknowledged == false &&
+                       !('confirmedAt' in incoming()) &&
+                       incoming().keys().hasAll([
+                         'customerId', 'customerName', 'customerMobile', 'customerAddress',
+                         'items', 'itemsTotal', 'deliveryCharge', 'grandTotal',
+                         'paymentMethod', 'status', 'cashReceived', 'adminAcknowledged',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'customerId', 'customerName', 'customerMobile', 'customerAddress',
+                         'customerLat', 'customerLng', 'items', 'itemsTotal',
+                         'deliveryCharge', 'grandTotal', 'paymentMethod',
+                         'upiTransactionId', 'paymentScreenshotBase64', 'status',
+                         'cashReceived', 'adminAcknowledged', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidOrder(incoming()) && (
+                         (incoming().paymentMethod == 'UPI' &&
+                          incoming().status == 'WAITING_PAYMENT_CONFIRMATION' &&
+                          'upiTransactionId' in incoming() &&
+                          incoming().upiTransactionId.size() >= 4) ||
+                         (incoming().paymentMethod == 'CASH' &&
+                          incoming().status == 'PLACED' &&
+                          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rating > 1 &&
+                          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.cashEnabled == true)
+                       );
+
+      allow update: if isSignedIn() && isValidId(orderId) &&
+                       isValidOrder(incoming()) &&
+                       incoming().customerId == existing().customerId &&
+                       incoming().createdAt == existing().createdAt && (
+                         // Admin full order management
+                         (isAdmin() &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'status', 'cashReceived', 'adminAcknowledged', 'confirmedAt', 'updatedAt'
+                          ])) ||
+                         // Packer marks PACKING -> READY
+                         (isPacker() &&
+                          existing().status == 'PACKING' &&
+                          incoming().status == 'READY' &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+                         // Customer cancels active order before out for delivery
+                         (existing().customerId == request.auth.uid &&
+                          existing().status in ['WAITING_PAYMENT_CONFIRMATION', 'PLACED', 'PAYMENT_CONFIRMED', 'PACKING'] &&
+                          incoming().status == 'CANCELLED' &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+                       );
+
+      allow delete: if isAdmin() && isValidId(orderId);
+    }
+  }
+}

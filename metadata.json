@@ -1,0 +1,6 @@
+{
+  "name": "Gramin Kirana",
+  "description": "Bilingual English and Bengali grocery delivery app for a village kirana shop in Assam serving customers, packers, and shop owners.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
