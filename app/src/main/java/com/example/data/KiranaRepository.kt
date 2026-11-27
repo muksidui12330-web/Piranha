@@ -72,6 +72,13 @@ class KiranaRepository(
     private fun normalizedEmail(): String =
         (auth.currentUser?.email ?: "").trim().lowercase(Locale.US)
 
+    private fun nonNullMap(vararg pairs: Pair<String, Any?>): Map<String, Any> =
+        buildMap {
+            for ((key, value) in pairs) {
+                if (value != null) put(key, value)
+            }
+        }
+
     // --- ROLE RESOLUTION ---
     suspend fun resolveCurrentUserRole(): UserRole {
         val email = normalizedEmail()
@@ -117,7 +124,7 @@ class KiranaRepository(
         val path = "config/shop"
         return try {
             requireUserId()
-            val payload = mapOf(
+            val payload = nonNullMap(
                 "shopName" to config.shopName.trim().take(80),
                 "bannerText" to config.bannerText.trim().take(160),
                 "bannerTextBn" to config.bannerTextBn.trim().take(160),
@@ -134,7 +141,7 @@ class KiranaRepository(
                 "upiQrBase64" to config.upiQrBase64,
                 "shopPhotoBase64" to config.shopPhotoBase64,
                 "updatedAt" to FieldValue.serverTimestamp()
-            ).filterValues { it != null } as Map<String, Any>
+            )
 
             db.collection("config").document("shop").set(payload).await()
             Result.success(Unit)
@@ -173,7 +180,7 @@ class KiranaRepository(
                 val batch = db.batch()
                 StarterCatalog.items.forEach { item ->
                     val ref = db.collection("items").document(item.id)
-                    val payload = mapOf(
+                    val payload = nonNullMap(
                         "nameEn" to item.nameEn,
                         "nameBn" to item.nameBn,
                         "category" to item.category,
@@ -184,7 +191,7 @@ class KiranaRepository(
                         "similarItemIds" to item.similarItemIds,
                         "createdAt" to FieldValue.serverTimestamp(),
                         "updatedAt" to FieldValue.serverTimestamp()
-                    ).filterValues { it != null } as Map<String, Any>
+                    )
                     batch.set(ref, payload)
                 }
                 batch.commit().await()
@@ -222,7 +229,7 @@ class KiranaRepository(
         return try {
             requireUserId()
             if (isNew) {
-                val payload = mapOf(
+                val payload = nonNullMap(
                     "nameEn" to item.nameEn.trim().take(100),
                     "nameBn" to item.nameBn.trim().take(100),
                     "category" to item.category,
@@ -234,7 +241,7 @@ class KiranaRepository(
                     "similarItemIds" to item.similarItemIds.take(5),
                     "createdAt" to FieldValue.serverTimestamp(),
                     "updatedAt" to FieldValue.serverTimestamp()
-                ).filterValues { it != null } as Map<String, Any>
+                )
                 docRef.set(payload).await()
             } else {
                 val updates = mutableMapOf<String, Any>(
@@ -327,7 +334,7 @@ class KiranaRepository(
         return try {
             val existing = ref.get().await()
             if (!existing.exists()) {
-                val payload = mapOf(
+                val payload = nonNullMap(
                     "uid" to uid,
                     "email" to email,
                     "name" to name.trim().take(80),
@@ -342,7 +349,7 @@ class KiranaRepository(
                     "profileCompleted" to true,
                     "createdAt" to FieldValue.serverTimestamp(),
                     "updatedAt" to FieldValue.serverTimestamp()
-                ).filterValues { it != null } as Map<String, Any>
+                )
                 ref.set(payload).await()
             } else {
                 val updates = mutableMapOf<String, Any>(
@@ -492,7 +499,7 @@ class KiranaRepository(
                 )
             }
 
-            val payload = mapOf(
+            val payload = nonNullMap(
                 "customerId" to uid,
                 "customerName" to profile.name.trim().take(80),
                 "customerMobile" to profile.mobile.trim().take(20),
@@ -511,7 +518,7 @@ class KiranaRepository(
                 "adminAcknowledged" to false,
                 "createdAt" to FieldValue.serverTimestamp(),
                 "updatedAt" to FieldValue.serverTimestamp()
-            ).filterValues { it != null } as Map<String, Any>
+            )
 
             docRef.set(payload).await()
             Result.success(docRef.id)

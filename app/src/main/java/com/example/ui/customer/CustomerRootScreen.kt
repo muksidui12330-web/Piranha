@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -150,7 +150,7 @@ fun CustomerRootScreen(
                             NavigationBarItem(
                                 selected = selectedTab == 1,
                                 onClick = { selectedTab = 1 },
-                                icon = { Icon(Icons.Default.ReceiptLong, contentDescription = strings.myOrders) },
+                                icon = { Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = strings.myOrders) },
                                 label = { Text(strings.myOrders) }
                             )
                         }

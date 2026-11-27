@@ -11,11 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -144,7 +144,7 @@ fun AdminScreen(
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.ReceiptLong, contentDescription = strings.tabOrders) },
+                    icon = { Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = strings.tabOrders) },
                     label = { Text(strings.tabOrders) }
                 )
                 NavigationBarItem(

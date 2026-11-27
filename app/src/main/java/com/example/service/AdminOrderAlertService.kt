@@ -113,7 +113,7 @@ class AdminOrderAlertService : Service(), TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            val res = tts?.setLanguage(Locale("en", "IN"))
+            val res = tts?.setLanguage(Locale.Builder().setLanguage("en").setRegion("IN").build())
             ttsReady = res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED
             if (!ttsReady) {
                 tts?.setLanguage(Locale.US)
